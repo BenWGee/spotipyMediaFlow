@@ -2,18 +2,59 @@
 # Jason Chen, 21 June 2020
 
 # Full credit to Jason for the initial script, some modifications have been made
-# to accomodate my specific needs.
+# to accomodate my specific needs, see README for more info
 
-import os
 import spotipy
+import sys, os, logging, datetime, time
 import credentials
+import shutil
 import spotipy.oauth2 as oauth2
 import yt_dlp
 from youtube_search import YoutubeSearch
 import multiprocessing
+from logging.handlers import RotatingFileHandler
+
+# Path to project
+path = ""
+#Create name
+name = "spotipyMediaFlow" #Project Name
+#Create version
+version = "0.0.0"
+#Set Log dir location
+log_dir = path + "logs/" #Path to logs file
+#Create PID
+pid = "pid="+str(os.getpid())+";"
+#LOGGING
+## Create Logger
+logger = logging.getLogger(name)
+##Set Default Logging Level
+logger.setLevel(logging.DEBUG)
+## Create Console Handler
+ch = logging.StreamHandler()
+## Set ch log level
+ch.setLevel(logging.DEBUG)
+## Create a rotating local log file handler
+#fh = logging.handlers.RotatingFileHandler(name+".log", mode='a', maxBytes=4096, backupCount=0, encoding=None, delay=False, errors=None)
+fh = logging.handlers.RotatingFileHandler(log_dir+name+".log", mode='a', maxBytes=4096, backupCount=0, encoding=None, delay=False)
+## Set fh log level
+fh.setLevel(logging.DEBUG)
+## Logging format options
+stdFormat = logging.Formatter('[%(asctime)s] '+pid+' level="%(levelname)s"; name="%(name)s"; message="%(message)s";', datefmt='%Y-%m-%dT%H:%M:%S')
+debugFormat = logging.Formatter('[%(asctime)s] '+pid+' level="%(levelname)s"; name="%(name)s"; function="%(funcName)s"; line="%(lineno)d"; message="%(message)s";', datefmt='%Y-%m-%dT%H:%M:%S')
+## Add formatting to handlers
+ch.setFormatter(debugFormat)
+fh.setFormatter(debugFormat)
+##Add log handlers
+logger.addHandler(ch)
+logger.addHandler(fh)
+
+# End of Logging boilerplate
+
+logger.info(os.path.basename(__file__) + " stated")
 
 # **************PLEASE READ THE README.md FOR USE INSTRUCTIONS**************
 
+#===============================================================================
 def write_tracks(text_file: str, tracks: dict):
     # Writes the information of all tracks in the playlist to a text file.
     # This includins the name, artist, and spotify URL. Each is delimited by a comma.
@@ -32,28 +73,30 @@ def write_tracks(text_file: str, tracks: dict):
                     try:
                         file_out.write(csv_line)
                     except UnicodeEncodeError:  # Most likely caused by non-English song names
-                        print("Track named {} failed due to an encoding error. This is \
+                        logger.warning("Track named {} failed due to an encoding error. This is \
                             most likely due to this song having a non-English name.".format(track_name))
                 except KeyError:
-                    print(u'Skipping track {0} by {1} (local only?)'.format(
+                    loger.warning(u'Skipping track {0} by {1} (local only?)'.format(
                             track['name'], track['artists'][0]['name']))
             # 1 page = 50 results, check if there are more pages
             if tracks['next']:
                 tracks = spotify.next(tracks)
             else:
                 break
+#===============================================================================
 
-
+#===============================================================================
 def write_playlist(username: str, playlist_id: str):
     results = spotify.user_playlist(username, playlist_id, fields='tracks,next,name')
     playlist_name = results['name']
     text_file = u'{0}.txt'.format(playlist_name, ok='-_()[]{}')
-    print(u'Writing {0} tracks to {1}.'.format(results['tracks']['total'], text_file))
+    logger.info(u'Writing {0} tracks to {1}.'.format(results['tracks']['total'], text_file))
     tracks = results['tracks']
     write_tracks(text_file, tracks)
     return playlist_name
+#===============================================================================
 
-
+#===============================================================================
 def find_and_download_songs(reference_file: str):
     TOTAL_ATTEMPTS = 10
     with open(reference_file, "r", encoding='utf-8') as file:
@@ -70,13 +113,11 @@ def find_and_download_songs(reference_file: str):
                     break
                 except IndexError:
                     attempts_left -= 1
-                    print("No valid URLs found for {}, trying again ({} attempts left).".format(
-                        text_to_search, attempts_left))
             if best_url is None:
-                print("No valid URLs found for {}, skipping track.".format(text_to_search))
+                logger.warning("No valid URLs found for {}, skipping track.".format(text_to_search))
                 continue
             # Run you-get to fetch and download the link's audio
-            print("Initiating download for {}.".format(text_to_search))
+            logger.info("Initiating download for {}.".format(text_to_search))
             ydl_opts = {
                 'format': 'bestaudio/best',
                 'postprocessors': [{
@@ -87,8 +128,9 @@ def find_and_download_songs(reference_file: str):
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([best_url])
+#===============================================================================
 
-
+#===============================================================================
 # Multiprocessed implementation of find_and_download_songs
 # This method is responsible for manging and distributing the multi-core workload
 def multicore_find_and_download_songs(reference_file: str, cpu_count: int):
@@ -142,7 +184,10 @@ def multicore_find_and_download_songs(reference_file: str, cpu_count: int):
     # Wait for the processes to complete and exit as a group
     for p in processes:
         p.join()
+#===============================================================================
 
+
+#===============================================================================
 # Just a wrapper around the original find_and_download_songs method to ensure future compatibility
 # Preserves the same functionality just allows for several shorter lists to be used and cleaned up
 def multicore_handler(reference_list: list, segment_index: int):
@@ -160,8 +205,10 @@ def multicore_handler(reference_list: list, segment_index: int):
     # Clean up the extra list that was generated
     if(os.path.exists(reference_filename)):
         os.remove(reference_filename)
+#===============================================================================
 
 
+#===============================================================================
 # This is prompt to handle the multicore queries
 # An effort has been made to create an easily automated interface
 # Autoeneable: bool allows for no prompts and defaults to max core usage
@@ -174,7 +221,7 @@ def enable_multicore(autoenable=False, maxcores=None, buffercores=1):
             if(maxcores <= native_cpu_count):
                 return maxcores
             else:
-                print("Too many cores requested, single core operation fallback")
+                logger.warning("Too many cores requested, single core operation fallback")
                 return 1
         return multiprocessing.cpu_count() - 1
     multicore_query = input("Enable multiprocessing (Y or N): ")
@@ -186,16 +233,30 @@ def enable_multicore(autoenable=False, maxcores=None, buffercores=1):
     if(core_count_query <= native_cpu_count):
         return core_count_query
     else:
-        print("Too many cores requested, single core operation fallback")
+        logger.warning("Too many cores requested, single core operation fallback")
         return 1
+#===============================================================================
+
+#===============================================================================
+# Move music from temp file, to source destination with all other local music
+def moveMusic(source):
+    source = source
+    destination = credentials.saveLocation + source
+    tracks = os.listdir(source)
+
+    for track in tracks:
+        srcName = os.path.join(source,track)
+        shutil.move(srcName,destination)
+
+
+#===============================================================================
 
 if __name__ == "__main__":
     # Parameters
-    print("Please read README.md for use instructions.")
     client_id = credentials.clientID #input("Client ID: ")
     client_secret = credentials.clientSecret #input("Client secret: ")
     username = credentials.username #input("Spotify username: ")
-    playlist_uri = "64PPN8XrEFO1fUT6wf2n22?si=6b206bc8a33d4396"#input("Playlist URI (excluding \"spotify:playlist:\"): ")
+    playlist_uri = "4f2kxjb1MyhL96kLz5x0ng" #input("Playlist URI (excluding \"spotify:playlist:\"): ")
     multicore_support = enable_multicore(autoenable=False, maxcores=None, buffercores=1)
     auth_manager = oauth2.SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
     spotify = spotipy.Spotify(auth_manager=auth_manager)
@@ -211,4 +272,7 @@ if __name__ == "__main__":
         multicore_find_and_download_songs(reference_file, multicore_support)
     else:
         find_and_download_songs(reference_file)
-    print("Operation complete.")
+
+    moveMusic(credentials.path + "\'" + reference_file.split(".")[0] + "\'")
+
+    logger.info(s.path.basename(__file__) + " finished")
