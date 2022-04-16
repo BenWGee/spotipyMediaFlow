@@ -1,8 +1,12 @@
 # Downloads a Spotify playlist into a folder of MP3 tracks
 # Jason Chen, 21 June 2020
 
+# Full credit to Jason for the initial script, some modifications have been made
+# to accomodate my specific needs.
+
 import os
 import spotipy
+import credentials
 import spotipy.oauth2 as oauth2
 import yt_dlp
 from youtube_search import YoutubeSearch
@@ -11,7 +15,7 @@ import multiprocessing
 # **************PLEASE READ THE README.md FOR USE INSTRUCTIONS**************
 
 def write_tracks(text_file: str, tracks: dict):
-    # Writes the information of all tracks in the playlist to a text file. 
+    # Writes the information of all tracks in the playlist to a text file.
     # This includins the name, artist, and spotify URL. Each is delimited by a comma.
     with open(text_file, 'w+', encoding='utf-8') as file_out:
         while True:
@@ -89,7 +93,7 @@ def find_and_download_songs(reference_file: str):
 # This method is responsible for manging and distributing the multi-core workload
 def multicore_find_and_download_songs(reference_file: str, cpu_count: int):
     # Extract songs from the reference file
-    
+
     lines = []
     with open(reference_file, "r", encoding='utf-8') as file:
         for line in file:
@@ -121,7 +125,7 @@ def multicore_find_and_download_songs(reference_file: str, cpu_count: int):
         segment = lines[index:right]
         index = index + cpu
         file_segments.append(segment)
-    
+
     # Prepares all of the seperate processes before starting them
     # Pass each process a new shorter list of songs vs 1 process being handed all of the songs
     processes = []
@@ -144,14 +148,14 @@ def multicore_find_and_download_songs(reference_file: str, cpu_count: int):
 def multicore_handler(reference_list: list, segment_index: int):
     # Create reference filename based off of the process id (segment_index)
     reference_filename = "{}.txt".format(segment_index)
-    
+
     # Write the reference_list to a new "reference_file" to enable compatibility
     with open(reference_filename, 'w+', encoding='utf-8') as file_out:
         for line in reference_list:
             file_out.write(line)
 
     # Call the original find_and_download method
-    find_and_download_songs(reference_filename)    
+    find_and_download_songs(reference_filename)
 
     # Clean up the extra list that was generated
     if(os.path.exists(reference_filename)):
@@ -187,11 +191,11 @@ def enable_multicore(autoenable=False, maxcores=None, buffercores=1):
 
 if __name__ == "__main__":
     # Parameters
-    print("Please read README.md for use instructions.")    
-    client_id = input("Client ID: ")
-    client_secret = input("Client secret: ")
-    username = input("Spotify username: ")
-    playlist_uri = input("Playlist URI (excluding \"spotify:playlist:\"): ")
+    print("Please read README.md for use instructions.")
+    client_id = credentials.clientID #input("Client ID: ")
+    client_secret = credentials.clientSecret #input("Client secret: ")
+    username = credentials.username #input("Spotify username: ")
+    playlist_uri = "64PPN8XrEFO1fUT6wf2n22?si=6b206bc8a33d4396"#input("Playlist URI (excluding \"spotify:playlist:\"): ")
     multicore_support = enable_multicore(autoenable=False, maxcores=None, buffercores=1)
     auth_manager = oauth2.SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
     spotify = spotipy.Spotify(auth_manager=auth_manager)

@@ -1,3 +1,24 @@
+# Disclaimer
+
+This is for educational purposes only, please see the original script by Jason Chen
+https://github.com/JayChen35/spotify-to-mp3-python.
+
+Some modifications have been made for my specific use case, please see them below.
+If you are unfamiliar with Spotify to MP3 scroll down to see Jason's section of the README below.
+
+# BenWGee edits
+
+1) Removed input() for client secrets, and instead created credentials.py to house secrets see the sampleCredentials.py and replace the values with your own credentials, and rename it to credentials.py. Make sure you include this file in your .gitignore to prevent people stealing your credentials.
+
+# BenWGee ToDo
+
+1) Add logging to check when files succeed/fail, where and when.
+
+2) Add ability to read in multiple playlists from a file, or as an argument through the command line.
+
+3) Save all music into 1 master "Music" folder, with the individual playlist within.
+
+
 # Spotify to MP3 - Python
 
 The simplest way to convert/download your Spotify playlist into MP3 files, using Python 3.
